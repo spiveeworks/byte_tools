@@ -1,51 +1,49 @@
-#![allow(dead_code)]
-
-
 
 use std::marker;
 
 
-trait StreamContainer<T>
+trait AsBytes
 {
-    type Iter: Iterator<Item = T>;
-    fn fill_with<I: Iterator<Item = T>> (stream: &mut I) -> Option<Self>
+    type Iter: Iterator<Item = u8>;
+    fn from_bytes<I: Iterator<Item = u8>>(bytes: &mut I) -> Option<Self>
         where Self: marker::Sized;
-    fn into_stream (self) -> Self::Iter;
+    fn into_bytes(self) -> Self::Iter;
 }
 
 
-trait StreamCast<T>
+trait AsBytesIntermediate
 {
-    type Base: StreamContainer<T>;
-    fn into_base(self) -> Self::Base;
+    type Base: AsBytes;
     fn from_base(Self::Base) -> Self;
+    fn into_base(self) -> Self::Base;
 }
 
-macro_rules! container_by_cast_items
+macro_rules! impl_from_intermediate_items
 {
-    ($Self: ty, $T: ty) =>
+    ($Self: ty) =>
     {
-        type Iter = <<$Self as StreamCast<$T>>::Base as StreamContainer<$T>>::Iter;
-        fn fill_with<I: Iterator<Item = $T>> (stream: &mut I) -> Option<$Self>
+        type Iter = <<$Self as AsBytesIntermediate>::Base as AsBytes>::Iter;
+        fn fill_with<I: Iterator<Item = u8>> (stream: &mut I) -> Option<$Self>
         {
-            let container = <$Self as StreamCast<$T>>::Base::fill_with(stream);
-            container.map(|base| Self::from_base(base))
+            let result_base = <<$Self as AsBytesIntermediate>::Base as AsBytes>::from_bytes(stream);
+            result_base.map(|base| <$Self as AsBytes>::from_base(base))
         }
-        fn into_stream (self) -> <$Self as StreamContainer<$T>>::Iter
-          { self.into_base().into_stream() }
+        fn into_stream (self: $Self) -> <$Self as AsBytes>::Iter
+        {
+            let base = <$Self as AsBytes>::into_base(self);
+            <<$Self as AsBytesIntermediate>::Base as AsBytes>::into_stream(base)
+        }
     }
 }
 
-macro_rules! container_by_cast
+macro_rules! impl_from_intermediate
 {
     ($C: ty) =>
     {
-        impl<T> StreamContainer<T> for $C
-            where $C: StreamCast<T>
+        impl AsBytes for $C
+            where $C: AsBytesIntermediate
         {
-            container_by_cast_items!(Self, T);
+            container_by_cast_items!(Self);  // this is encapsulated separately in case implementors wish to define extra constraints or blanket implementations
         }
     }
 }
-
-
