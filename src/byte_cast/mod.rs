@@ -49,6 +49,20 @@ macro_rules! compose_bytes_traits
     }
 }
 
+macro_rules! try_from_bytes
+ {
+    ($stream:expr) => 
+    {
+        match AsBytes::from_bytes($stream)
+        {
+            Some(x) => x,
+            None => return None,
+        }
+    };
+}
+
+#[macro_use]
+mod impls;  // defines some boilerplate trait impls such as arrays and tuples that make many other implementations much simpler
 
 #[macro_use]
 mod tests;
