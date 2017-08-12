@@ -96,7 +96,16 @@ impl_tuple_as_bytes!
 {
     a: A,
     b: B,
-    c: C
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: It,  // workaround for a type parameter used by the compose_bytes_methods! macro
+    j: J,
+    k: K,
+    l: L
 }
 
 
