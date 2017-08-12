@@ -1,44 +1,38 @@
-use stream_container::{StreamContainer, StreamCast};
+use byte_cast::{AsBytes, AsBytesIntermediate};
 
 use std::iter;
 
 
-impl<T, A, B> StreamContainer<T> for (A, B)
-    where A: StreamContainer<T>,
-          B: StreamContainer<T>,
+impl<A, B> AsBytes for (A, B)
+    where A: AsBytes,
+          B: AsBytes,
 {
-    type Iter = iter::Chain<<A as StreamContainer<T>>::Iter, <B as StreamContainer<T>>::Iter>;
-    fn fill_with<I: Iterator<Item=T>> (stream: &mut I) -> Option<Self>
+    type Iter = iter::Chain<<A as AsBytes>::Iter, <B as AsBytes>::Iter>;
+    fn from_bytes<I: Iterator<Item=u8>> (stream: &mut I) -> Option<Self>
     {
-        if let Some(a) = StreamContainer::<T>::fill_with(stream)
-        {
-            if let Some(b) = StreamContainer::<T>::fill_with(stream)
-              { Some((a, b)) }
-            else
-              { None }
-        }
-        else
-          { None }
+        let a = try_from_bytes!(stream);
+        let b = try_from_bytes!(stream);
+        Some((a, b))
     }
-    fn into_stream(self) -> Self::Iter
+    fn into_bytes(self) -> Self::Iter
     {
-        self.0.into_stream().chain(self.1.into_stream())
+        self.0.into_bytes().chain(self.1.into_bytes())
     }
 }
 
 /*
-impl<T> StreamContainer<T> for ()
+impl AsBytes for ()
 {
-    type Iter = iter::Empty<T>;
+    type Iter = iter::Empty<u8>;
     fn fill_with<I> (_stream: &mut I) -> Option<Self>
       { Some(()) }
     fn into_stream(self) -> Self::Iter
       { iter::empty() }
 }
-*/
 
-impl<T> StreamCast<T> for (T,)
-    where T: StreamContainer<T> // implemented by default elsewhere
+
+impl<T> AsBytesIntermediate for (T,)
+    where T: AsBytes
 {
     type Base = T;
     fn into_base(self) -> T
@@ -46,8 +40,9 @@ impl<T> StreamCast<T> for (T,)
     fn from_base(base: T) -> Self
       { (base,) }
 }
+*/
 
-macro_rules! tuple_impl_stream_container
+macro_rules! impl_tuple_as_bytes
 {
     {
         $N1: ident : $T1: ident,
@@ -55,10 +50,10 @@ macro_rules! tuple_impl_stream_container
         $($Ns: ident : $Ts: ident),+
     } =>
     {
-        impl<T, $T1, $T2, $($Ts),+> StreamCast<T> for ($T1, $T2, $($Ts),+)
-            where $T1: StreamContainer<T>,
-                  $T2: StreamContainer<T>,
-                  $($Ts: StreamContainer<T>),+
+        impl<$T1, $T2, $($Ts),+> AsBytesIntermediate for ($T1, $T2, $($Ts),+)
+            where $T1: AsBytes,
+                  $T2: AsBytes,
+                  $($Ts: AsBytes),+
         {
             type Base = (($T1, $T2), $($Ts),+);
             fn from_base(base: Self::Base) -> Self
@@ -73,14 +68,14 @@ macro_rules! tuple_impl_stream_container
             }
         }
 
-        impl<T, $T1, $T2, $($Ts),+> StreamContainer<T> for ($T1, $T2, $($Ts),+)
-            where Self: StreamCast<T> // offload the actual requirements to StreamCast
+        impl<$T1, $T2, $($Ts),+> AsBytes for ($T1, $T2, $($Ts),+)
+            where Self: AsBytesIntermediate // which implies the constraints defined above
         {
             // use the internal macro since we need to use different template args + restrictions
-            container_by_cast_items!(Self, T);
+            compose_bytes_methods!(Self);
         }
 
-        tuple_impl_stream_container!
+        impl_tuple_as_bytes!
         {
             $N2: $T2,
             $($Ns: $Ts),+
@@ -97,7 +92,7 @@ macro_rules! tuple_impl_stream_container
 
 }
 
-tuple_impl_stream_container!
+impl_tuple_as_bytes!
 {
     a: A,
     b: B,
