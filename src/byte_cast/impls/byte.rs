@@ -1,13 +1,13 @@
-use stream_container::{StreamContainer};
+use byte_cast::{AsBytes};
 
 use std::iter;
 
 
-impl<T> StreamContainer<T> for T
+impl AsBytes for u8
 {
-    type Iter = iter::Once<T>;
-    fn fill_with<I: Iterator<Item=T>> (stream: &mut I) -> T
+    type Iter = iter::Once<u8>;
+    fn from_bytes<I: Iterator<Item=u8>> (stream: &mut I) -> Option<u8>
       { stream.next() }
-    fn into_stream (self) -> Self::Iter
+    fn into_bytes (self) -> Self::Iter
       { iter::once(self) }
 }
