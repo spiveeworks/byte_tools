@@ -1,60 +1,57 @@
-use stream_container::{StreamContainer};
+use byte_cast::{AsBytes};
 
 use std::vec;
-use std::mem;
-
-fn box_into_vec<T> (mut slice: Box<[T]>) -> Vec<T>
-{
-    let len = slice.len();
-    let result = unsafe { Vec::from_raw_parts(slice.as_mut_ptr(), len, len) };
-    mem::forget(slice);
-    result
-}
+use std::iter;
 
 
-macro_rules! dummy 
+macro_rules! dummy
 {
     ($x:expr) => ();
 }
 
-macro_rules! expr_arr
+// replace each term after the semicolon with a copy of the _expression_ before the semicolon
+macro_rules! array_dummy_map
 {
+    [$x: expr; $($ns:tt),*,] => {array_dummy_map![$x; $($ns),*]};
     [$x: expr; $($ns:tt),*] => {[$({dummy!($ns); $x}),*]};
 }
 
-macro_rules! array_impl_stream_container 
+
+macro_rules! impl_array_as_bytes
 {
-    {$n:expr, $($ns:expr),+} => 
+    {$n:expr} =>
     {
-        impl<T> StreamContainer<T> for [T; $n]
+        impl_array_as_bytes!{$n,}
+    };
+    {$n:expr, $($ns:expr),*} =>
+    {
+        impl<T: AsBytes> AsBytes for [T; $n]
         {
-            type Iter = vec::IntoIter<T>;
-            fn fill_with<I: Iterator<Item = T>> (stream: &mut I) -> Option<Self>
+            type Iter = iter::FlatMap<vec::IntoIter<T>, T::Iter, fn(T) -> T::Iter>;
+            //type Iter = vec::IntoIter<u8>; // this needs to be FlatMap<IntoIter, T::Iter, _something>
+            #[allow(unused_variables)] // stream is unused in the [T; 0] case, but this is fine
+            fn from_bytes<I: Iterator<Item = u8>> (stream: &mut I) -> Option<Self>
             {
-                Some(expr_arr![
-                     try_option!(stream.next()); 
-                     $($ns),+])
+                Some(array_dummy_map![
+                     try_from_bytes!(stream);
+                     $($ns),*])
             }
-            fn into_stream(self) -> Self::Iter
-              {box_into_vec(Box::new(self)).into_iter()}
+            fn into_bytes(self) -> Self::Iter
+            {
+                let box_self: Box<[T]> = Box::new(self);
+                box_self.into_vec()
+                        .into_iter()
+                        .flat_map(AsBytes::into_bytes)
+            }
         }
 
-        array_impl_stream_container!{$($ns),+}
+        impl_array_as_bytes!{$($ns),*}
     };
 
-    {$n:expr} => {
-        impl<T> StreamContainer<T> for [T; $n]
-        {
-            type Iter = vec::IntoIter<T>;
-            fn fill_with<I: Iterator<Item = T>> (_stream: &mut I) -> Option<Self>
-              {Some([])}
-            fn into_stream(self) -> Self::Iter
-              {Vec::new().into_iter()}
-        }
-    };
+    {} => {}
 }
 
-array_impl_stream_container!
+impl_array_as_bytes!
 {
                                 32, 31, 30,
     29, 28, 27, 26, 25, 24, 23, 22, 21, 20,
