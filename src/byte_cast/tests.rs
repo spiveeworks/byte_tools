@@ -3,31 +3,10 @@
 use super::*;
 
 use std::mem;
-use std::vec;
 
 
 #[derive(PartialEq, Eq, Clone, Default, Debug)]
 struct Test(u8, u32);
-
-impl AsBytes for [u8; 4]
-{
-    type Iter = vec::IntoIter<u8>;
-    fn from_bytes<I: Iterator<Item = u8>>(stream: &mut I) -> Option<Self>
-    {
-        let mut result = [0; 4];
-        for i in 0..4
-        {
-            result[i] = try_from_bytes!(stream);
-        }
-        Some(result)
-    }
-    fn into_bytes(self) -> Self::Iter
-    {
-        let mut result = Vec::with_capacity(4);
-        result.extend_from_slice(&self);
-        result.into_iter()
-    }
-}
 
 impl AsBytesIntermediate for Test
 {
